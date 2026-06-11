@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Database — never commit local data to Git
+*.db
+
+# Secrets — never commit real environment variables
+.env
+
+# uv lock file is optional — commit it for reproducible deploys
+# uv.lock
