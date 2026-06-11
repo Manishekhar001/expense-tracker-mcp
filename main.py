@@ -1,4 +1,5 @@
 import csv
+import functools
 import io
 import json
 import os
@@ -87,6 +88,22 @@ def insert(sql, params=None):
 MCP_API_KEY = os.environ.get("MCP_API_KEY", "")
 
 
+# ── JSON Response Decorator ───────────────────────────────────────────────────
+# Ensures all tool responses are JSON strings (required by OpenAI/Groq API for
+# ToolMessage.content). Without this, dict/list returns cause API validation
+# errors when the agent uses tools.
+
+
+def json_response(func):
+    """Decorator: wraps the return value in json.dumps() for MCP tools.
+    Must be placed BELOW @mcp.tool so it wraps before FastMCP registers."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        result = func(*args, **kwargs)
+        return json.dumps(result)
+    return wrapper
+
+
 def authenticated(api_key: str = "") -> str | None:
     """
     Check if the provided API key is valid.
@@ -149,6 +166,7 @@ init_db()
 # ── 1. Add Expense ─────────────────────────────────────────────────────────────
 
 @mcp.tool
+@json_response
 def add_expense(
     date: str,
     amount: float,
@@ -179,6 +197,7 @@ def add_expense(
 # ── 2. Get Expense (single) ────────────────────────────────────────────────────
 
 @mcp.tool
+@json_response
 def get_expense(expense_id: int, api_key: str = ""):
     """
     Fetch a single expense by its ID.
@@ -197,6 +216,7 @@ def get_expense(expense_id: int, api_key: str = ""):
 # ── 3. Update Expense ──────────────────────────────────────────────────────────
 
 @mcp.tool
+@json_response
 def update_expense(
     expense_id: int,
     date: str = None,
@@ -253,6 +273,7 @@ def update_expense(
 # ── 4. Delete Expense ──────────────────────────────────────────────────────────
 
 @mcp.tool
+@json_response
 def delete_expense(expense_id: int, api_key: str = ""):
     """
     Delete an expense by its ID.
@@ -271,6 +292,7 @@ def delete_expense(expense_id: int, api_key: str = ""):
 # ── 5. Search Expenses ─────────────────────────────────────────────────────────
 
 @mcp.tool
+@json_response
 def search_expenses(keyword: str, api_key: str = ""):
     """
     Search expenses by keyword across notes, categories, and subcategories.
@@ -292,6 +314,7 @@ def search_expenses(keyword: str, api_key: str = ""):
 # ── 6. List Expenses ───────────────────────────────────────────────────────────
 
 @mcp.tool
+@json_response
 def list_expenses(start_date: str, end_date: str, api_key: str = ""):
     """
     Fetch all expenses between start_date and end_date (inclusive).
@@ -310,6 +333,7 @@ def list_expenses(start_date: str, end_date: str, api_key: str = ""):
 # ── 7. Summarize ───────────────────────────────────────────────────────────────
 
 @mcp.tool
+@json_response
 def summarize(start_date: str, end_date: str, category: str = None, api_key: str = ""):
     """
     Summarize total spending grouped by category within a date range.
@@ -334,6 +358,7 @@ def summarize(start_date: str, end_date: str, category: str = None, api_key: str
 # ── 8. Set Budget ──────────────────────────────────────────────────────────────
 
 @mcp.tool
+@json_response
 def set_budget(category: str, amount: float, period: str = "monthly", api_key: str = ""):
     """
     Set or update a budget for a specific category.
@@ -362,6 +387,7 @@ def set_budget(category: str, amount: float, period: str = "monthly", api_key: s
 # ── 9. Budget Status ───────────────────────────────────────────────────────────
 
 @mcp.tool
+@json_response
 def budget_status(month: str = None, year: str = None, api_key: str = ""):
     """
     Check how actual spending compares to budgets for each category.
@@ -416,6 +442,7 @@ def budget_status(month: str = None, year: str = None, api_key: str = ""):
 # ── 10. Export CSV ────────────────────────────────────────────────────────────
 
 @mcp.tool
+@json_response
 def export_csv(start_date: str, end_date: str, api_key: str = ""):
     """
     Export expenses in CSV format (ready to open in Excel / Google Sheets).
@@ -452,6 +479,7 @@ def export_csv(start_date: str, end_date: str, api_key: str = ""):
 # ── 11. Add Recurring Expense ──────────────────────────────────────────────────
 
 @mcp.tool
+@json_response
 def add_recurring_expense(
     description: str,
     amount: float,
@@ -493,6 +521,7 @@ def add_recurring_expense(
 # ── 12. List Recurring Expenses ────────────────────────────────────────────────
 
 @mcp.tool
+@json_response
 def list_recurring_expenses(api_key: str = ""):
     """
     List all active recurring expenses (subscriptions, EMIs, etc.).
