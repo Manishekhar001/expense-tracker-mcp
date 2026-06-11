@@ -13,8 +13,13 @@ from fastmcp import FastMCP
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
 if DATABASE_URL:
-    import psycopg2
-    import psycopg2.extras
+    try:
+        import psycopg2
+        import psycopg2.extras
+    except ImportError:
+        import sys
+        print("psycopg2 not installed. Falling back to SQLite.", file=sys.stderr)
+        DATABASE_URL = ""  # reset so _is_pg() returns False
 
 
 def _is_pg():
