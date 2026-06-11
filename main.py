@@ -26,6 +26,8 @@ def _adapt(sql):
         return sql
     sql = sql.replace("?", "%s")
     sql = sql.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY")
+    # PostgreSQL LIKE is case-sensitive; use ILIKE for case-insensitive search
+    sql = sql.replace(" LIKE ?", " ILIKE %s")
     return sql
 
 
