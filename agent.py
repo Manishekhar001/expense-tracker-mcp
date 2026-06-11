@@ -6,10 +6,9 @@ import uuid
 from datetime import date
 
 from dotenv import load_dotenv
-from langchain_core.messages import SystemMessage
+from langchain.agents import create_agent
 from langchain_groq import ChatGroq
 from langchain_mcp_adapters.client import MultiServerMCPClient
-from langgraph.prebuilt import create_react_agent
 from langgraph.checkpoint.memory import MemorySaver
 
 # ── Load environment ──────────────────────────────────────────────────────────
@@ -109,14 +108,20 @@ async def main():
     # ── Build LLM & agent ──────────────────────────────────────────────────
     llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
 
+    system_message = build_system_message(categories_text)
+
     # MemorySaver keeps conversation history across turns
+    # prompt=system_message is automatically prepended as SystemMessage
     memory = MemorySaver()
-    agent = create_react_agent(llm, tools, checkpointer=memory)
+    agent = create_agent(
+        llm,
+        tools,
+        system_prompt=system_message,
+        checkpointer=memory,
+    )
 
     # Each conversation session gets a unique thread_id
     config = {"configurable": {"thread_id": "expense-tracker-interactive"}}
-
-    system_message = build_system_message(categories_text)
 
     # ── Interactive loop ────────────────────────────────────────────────────
     print()
@@ -126,8 +131,6 @@ async def main():
     print()
     print("  Commands:  /exit  /reset  /help")
     print("=" * 58)
-
-    first_turn = True
 
     while True:
         try:
@@ -147,7 +150,6 @@ async def main():
                 break
             elif cmd == "reset":
                 config = {"configurable": {"thread_id": str(uuid.uuid4())}}
-                first_turn = True
                 print("  Memory cleared. Starting fresh.")
                 continue
             elif cmd == "help":
@@ -169,11 +171,9 @@ async def main():
                 continue
 
         # ── Send to agent ──────────────────────────────────────────────────
-        if first_turn:
-            messages = [SystemMessage(content=system_message), ("human", query)]
-            first_turn = False
-        else:
-            messages = [("human", query)]
+        # The prompt (system_message) is automatically prepended by create_agent.
+        # MemorySaver preserves the conversation, so we just send the new query.
+        messages = [("human", query)]
 
         print()
         print("[Agent] ", end="", flush=True)
