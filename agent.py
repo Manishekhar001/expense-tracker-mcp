@@ -15,6 +15,7 @@ from langgraph.checkpoint.memory import MemorySaver
 # ── Load environment ──────────────────────────────────────────────────────────
 load_dotenv()
 MCP_URL = os.getenv("MCP_SERVER_URL", "http://localhost:8000/mcp")
+MCP_API_KEY = os.getenv("MCP_API_KEY", "")
 TODAY = date.today().strftime("%d/%m/%Y")
 
 # Fallback categories — mirrors categories.json exactly
@@ -65,7 +66,12 @@ def build_system_message(categories_text: str) -> str:
         f"- Use DD/MM/YYYY format for all dates.\n"
         f"- Amounts are in Indian Rupees (INR).\n"
         f"- When asked about spending, use the tools available to get real data.\n"
-        f"- You have access to tools for budgets and recurring expenses too — use them."
+        f"- You have access to tools for budgets and recurring expenses too — use them.\n"
+        + (
+            f"- Use api_key=\"{MCP_API_KEY}\" with every tool call. Always pass this api_key parameter.\n"
+            if MCP_API_KEY
+            else ""
+        )
     )
 
 

@@ -81,6 +81,22 @@ def insert(sql, params=None):
         conn.close()
 
 
+# ── Authentication ───────────────────────────────────────────────────────────
+# Set MCP_API_KEY env var on Render to require an API key for all tool calls.
+# When not set (local dev), authentication is skipped.
+MCP_API_KEY = os.environ.get("MCP_API_KEY", "")
+
+
+def authenticated(api_key: str = "") -> str | None:
+    """
+    Check if the provided API key is valid.
+    Returns an error message string if auth fails, or None if OK.
+    """
+    if MCP_API_KEY and api_key != MCP_API_KEY:
+        return "Invalid or missing API key. Provide the correct api_key parameter."
+    return None
+
+
 # ── Paths ────────────────────────────────────────────────────────────────────
 CATEGORIES_PATH = os.path.join(os.path.dirname(__file__), "categories.json")
 
@@ -139,6 +155,7 @@ def add_expense(
     category: str,
     subcategory: str = "",
     note: str = "",
+    api_key: str = "",
 ):
     """
     Add a new expense to the tracker.
@@ -147,7 +164,11 @@ def add_expense(
     - category: must match one of the keys in categories.json
     - subcategory: optional subcategory from categories.json
     - note: optional free-text note
+    - api_key: required if MCP_API_KEY is set on the server
     """
+    auth_error = authenticated(api_key)
+    if auth_error:
+        return {"status": "error", "message": auth_error}
     new_id = insert(
         "INSERT INTO expenses (date, amount, category, subcategory, note) VALUES (?, ?, ?, ?, ?)",
         (date, amount, category, subcategory, note),
@@ -158,11 +179,15 @@ def add_expense(
 # ── 2. Get Expense (single) ────────────────────────────────────────────────────
 
 @mcp.tool
-def get_expense(expense_id: int):
+def get_expense(expense_id: int, api_key: str = ""):
     """
     Fetch a single expense by its ID.
     - expense_id: the numeric ID of the expense
+    - api_key: required if MCP_API_KEY is set on the server
     """
+    auth_error = authenticated(api_key)
+    if auth_error:
+        return {"status": "error", "message": auth_error}
     results = query("SELECT * FROM expenses WHERE id = ?", (expense_id,))
     if not results:
         return {"status": "error", "message": f"No expense found with id {expense_id}"}
@@ -179,6 +204,7 @@ def update_expense(
     category: str = None,
     subcategory: str = None,
     note: str = None,
+    api_key: str = "",
 ):
     """
     Update one or more fields of an existing expense.
@@ -188,8 +214,12 @@ def update_expense(
     - category: optional — new category
     - subcategory: optional — new subcategory
     - note: optional — new note
+    - api_key: required if MCP_API_KEY is set on the server
     Only the fields you provide will be changed.
     """
+    auth_error = authenticated(api_key)
+    if auth_error:
+        return {"status": "error", "message": auth_error}
     fields = []
     params = []
     for field, value in [
@@ -223,11 +253,15 @@ def update_expense(
 # ── 4. Delete Expense ──────────────────────────────────────────────────────────
 
 @mcp.tool
-def delete_expense(expense_id: int):
+def delete_expense(expense_id: int, api_key: str = ""):
     """
     Delete an expense by its ID.
     - expense_id: the ID of the expense to delete
+    - api_key: required if MCP_API_KEY is set on the server
     """
+    auth_error = authenticated(api_key)
+    if auth_error:
+        return {"status": "error", "message": auth_error}
     rows = execute("DELETE FROM expenses WHERE id = ?", (expense_id,))
     if rows == 0:
         return {"status": "error", "message": f"No expense found with id {expense_id}"}
@@ -237,11 +271,15 @@ def delete_expense(expense_id: int):
 # ── 5. Search Expenses ─────────────────────────────────────────────────────────
 
 @mcp.tool
-def search_expenses(keyword: str):
+def search_expenses(keyword: str, api_key: str = ""):
     """
     Search expenses by keyword across notes, categories, and subcategories.
     - keyword: the text to search for (case-insensitive)
+    - api_key: required if MCP_API_KEY is set on the server
     """
+    auth_error = authenticated(api_key)
+    if auth_error:
+        return {"status": "error", "message": auth_error}
     pattern = f"%{keyword}%"
     return query(
         "SELECT * FROM expenses "
@@ -254,11 +292,15 @@ def search_expenses(keyword: str):
 # ── 6. List Expenses ───────────────────────────────────────────────────────────
 
 @mcp.tool
-def list_expenses(start_date: str, end_date: str):
+def list_expenses(start_date: str, end_date: str, api_key: str = ""):
     """
     Fetch all expenses between start_date and end_date (inclusive).
     Both dates must be in DD/MM/YYYY format.
+    - api_key: required if MCP_API_KEY is set on the server
     """
+    auth_error = authenticated(api_key)
+    if auth_error:
+        return {"status": "error", "message": auth_error}
     return query(
         "SELECT * FROM expenses WHERE date BETWEEN ? AND ? ORDER BY id ASC",
         (start_date, end_date),
@@ -268,12 +310,16 @@ def list_expenses(start_date: str, end_date: str):
 # ── 7. Summarize ───────────────────────────────────────────────────────────────
 
 @mcp.tool
-def summarize(start_date: str, end_date: str, category: str = None):
+def summarize(start_date: str, end_date: str, category: str = None, api_key: str = ""):
     """
     Summarize total spending grouped by category within a date range.
     Optionally filter to a single category.
     Both dates must be in DD/MM/YYYY format.
+    - api_key: required if MCP_API_KEY is set on the server
     """
+    auth_error = authenticated(api_key)
+    if auth_error:
+        return {"status": "error", "message": auth_error}
     sql = "SELECT category, SUM(amount) AS total_amount FROM expenses WHERE date BETWEEN ? AND ?"
     params = [start_date, end_date]
 
@@ -288,13 +334,17 @@ def summarize(start_date: str, end_date: str, category: str = None):
 # ── 8. Set Budget ──────────────────────────────────────────────────────────────
 
 @mcp.tool
-def set_budget(category: str, amount: float, period: str = "monthly"):
+def set_budget(category: str, amount: float, period: str = "monthly", api_key: str = ""):
     """
     Set or update a budget for a specific category.
     - category: the expense category (must match categories.json keys)
     - amount: the budget amount in Rupees
     - period: 'monthly' or 'weekly' (default: monthly)
+    - api_key: required if MCP_API_KEY is set on the server
     """
+    auth_error = authenticated(api_key)
+    if auth_error:
+        return {"status": "error", "message": auth_error}
     existing = query("SELECT id FROM budgets WHERE category = ?", (category,))
     if existing:
         execute(
@@ -312,12 +362,16 @@ def set_budget(category: str, amount: float, period: str = "monthly"):
 # ── 9. Budget Status ───────────────────────────────────────────────────────────
 
 @mcp.tool
-def budget_status(month: str = None, year: str = None):
+def budget_status(month: str = None, year: str = None, api_key: str = ""):
     """
     Check how actual spending compares to budgets for each category.
     - month: optional — month as two digits (e.g. '06'). Defaults to current month.
     - year: optional — year as four digits (e.g. '2026'). Defaults to current year.
+    - api_key: required if MCP_API_KEY is set on the server
     """
+    auth_error = authenticated(api_key)
+    if auth_error:
+        return {"status": "error", "message": auth_error}
     today = datetime.now()
     month = month or today.strftime("%m")
     year = year or str(today.year)
@@ -362,13 +416,17 @@ def budget_status(month: str = None, year: str = None):
 # ── 10. Export CSV ────────────────────────────────────────────────────────────
 
 @mcp.tool
-def export_csv(start_date: str, end_date: str):
+def export_csv(start_date: str, end_date: str, api_key: str = ""):
     """
     Export expenses in CSV format (ready to open in Excel / Google Sheets).
     - start_date: DD/MM/YYYY
     - end_date: DD/MM/YYYY
+    - api_key: required if MCP_API_KEY is set on the server
     Returns the CSV content as a string.
     """
+    auth_error = authenticated(api_key)
+    if auth_error:
+        return {"status": "error", "message": auth_error}
     rows = query(
         "SELECT id, date, amount, category, subcategory, note "
         "FROM expenses WHERE date BETWEEN ? AND ? ORDER BY id ASC",
@@ -401,6 +459,7 @@ def add_recurring_expense(
     subcategory: str = "",
     day_of_month: int = 1,
     start_date: str = "",
+    api_key: str = "",
 ):
     """
     Register a recurring (monthly) expense.
@@ -410,7 +469,11 @@ def add_recurring_expense(
     - subcategory: optional subcategory
     - day_of_month: day of month to apply (1-31, default 1)
     - start_date: first occurrence date in DD/MM/YYYY (defaults to today)
+    - api_key: required if MCP_API_KEY is set on the server
     """
+    auth_error = authenticated(api_key)
+    if auth_error:
+        return {"status": "error", "message": auth_error}
     if not start_date:
         start_date = datetime.now().strftime("%d/%m/%Y")
 
@@ -430,10 +493,14 @@ def add_recurring_expense(
 # ── 12. List Recurring Expenses ────────────────────────────────────────────────
 
 @mcp.tool
-def list_recurring_expenses():
+def list_recurring_expenses(api_key: str = ""):
     """
     List all active recurring expenses (subscriptions, EMIs, etc.).
+    - api_key: required if MCP_API_KEY is set on the server
     """
+    auth_error = authenticated(api_key)
+    if auth_error:
+        return {"status": "error", "message": auth_error}
     return query(
         "SELECT * FROM recurring_expenses WHERE active = 1 ORDER BY day_of_month ASC"
     )
