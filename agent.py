@@ -6,10 +6,11 @@ import uuid
 from datetime import date
 
 from dotenv import load_dotenv
-from langchain.agents import create_agent
+from langchain_core.messages import SystemMessage
 from langchain_groq import ChatGroq
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.prebuilt import create_react_agent
 
 # ── Load environment ──────────────────────────────────────────────────────────
 load_dotenv()
@@ -74,6 +75,34 @@ def build_system_message(categories_text: str) -> str:
     )
 
 
+    # ── Wrap tools: stringify results ──────────────────────────────────────
+    # The installed langgraph version uses response_format='content_and_artifact',
+    # which expects tool outputs as a tuple (string_content, raw_artifact).
+    # We wrap func/coroutine to return (json_string, original_result).
+
+    def _wrap_coro(fn):
+        async def wrapped(*args, **kwargs):
+            result = await fn(*args, **kwargs)
+            if isinstance(result, str):
+                return result
+            return json.dumps(result, default=str), result
+        return wrapped
+
+    def _wrap_func(fn):
+        def wrapped(*args, **kwargs):
+            result = fn(*args, **kwargs)
+            if isinstance(result, str):
+                return result
+            return json.dumps(result, default=str), result
+        return wrapped
+
+    for tool in tools:
+        if tool.coroutine is not None:
+            tool.coroutine = _wrap_coro(tool.coroutine)
+        if tool.func is not None:
+            tool.func = _wrap_func(tool.func)
+
+
 async def main():
     print()
     print("  Connecting to MCP server...")
@@ -107,20 +136,10 @@ async def main():
 
     # ── Build LLM & agent ──────────────────────────────────────────────────
     llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
-
     system_message = build_system_message(categories_text)
 
-    # MemorySaver keeps conversation history across turns
-    # prompt=system_message is automatically prepended as SystemMessage
     memory = MemorySaver()
-    agent = create_agent(
-        llm,
-        tools,
-        system_prompt=system_message,
-        checkpointer=memory,
-    )
-
-    # Each conversation session gets a unique thread_id
+    agent = create_react_agent(llm, tools, checkpointer=memory)
     config = {"configurable": {"thread_id": "expense-tracker-interactive"}}
 
     # ── Interactive loop ────────────────────────────────────────────────────
@@ -131,6 +150,8 @@ async def main():
     print()
     print("  Commands:  /exit  /reset  /help")
     print("=" * 58)
+
+    first_turn = True
 
     while True:
         try:
@@ -150,6 +171,7 @@ async def main():
                 break
             elif cmd == "reset":
                 config = {"configurable": {"thread_id": str(uuid.uuid4())}}
+                first_turn = True
                 print("  Memory cleared. Starting fresh.")
                 continue
             elif cmd == "help":
@@ -171,9 +193,11 @@ async def main():
                 continue
 
         # ── Send to agent ──────────────────────────────────────────────────
-        # The prompt (system_message) is automatically prepended by create_agent.
-        # MemorySaver preserves the conversation, so we just send the new query.
-        messages = [("human", query)]
+        if first_turn:
+            messages = [SystemMessage(content=system_message), ("human", query)]
+            first_turn = False
+        else:
+            messages = [("human", query)]
 
         print()
         print("[Agent] ", end="", flush=True)
@@ -181,7 +205,6 @@ async def main():
         full_response = ""
 
         try:
-            # Stream the response token-by-token using astream_events
             async for event in agent.astream_events(
                 {"messages": messages},
                 config,
@@ -189,16 +212,13 @@ async def main():
             ):
                 kind = event["event"]
 
-                # Token-level streaming from the LLM
                 if kind == "on_chat_model_stream":
                     chunk = event["data"]["chunk"]
                     if hasattr(chunk, "content") and chunk.content:
-                        # Skip tool-call chunks that have no visible content
                         if isinstance(chunk.content, str):
                             print(chunk.content, end="", flush=True)
                             full_response += chunk.content
 
-                # Show when a tool is called
                 elif kind == "on_tool_start":
                     tool_name = event["name"]
                     print(f"\n  [Using: {tool_name}]", end="", flush=True)
