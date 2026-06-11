@@ -1,7 +1,6 @@
 import asyncio
 import json
 import os
-import sys
 import uuid
 from datetime import date
 
@@ -75,9 +74,28 @@ def build_system_message(categories_text: str) -> str:
     )
 
 
+async def main():
+    print()
+    print("  Connecting to MCP server...")
+
+    # ── Connect to MCP ──────────────────────────────────────────────────────
+    client = MultiServerMCPClient(
+        {
+            "expense_tracker": {
+                "url": MCP_URL,
+                "transport": "streamable_http",
+            }
+        }
+    )
+
+    # ── Discover tools ──────────────────────────────────────────────────────
+    tools = await client.get_tools()
+    tool_names = [t.name for t in tools]
+    print(f"  Tools loaded: {len(tools)} — {', '.join(tool_names)}")
+
     # ── Wrap tools: stringify results ──────────────────────────────────────
     # The installed langgraph version uses response_format='content_and_artifact',
-    # which expects tool outputs as a tuple (string_content, raw_artifact).
+    # which expects tool outputs as (string_content, raw_artifact).
     # We wrap func/coroutine to return (json_string, original_result).
 
     def _wrap_coro(fn):
@@ -101,26 +119,6 @@ def build_system_message(categories_text: str) -> str:
             tool.coroutine = _wrap_coro(tool.coroutine)
         if tool.func is not None:
             tool.func = _wrap_func(tool.func)
-
-
-async def main():
-    print()
-    print("  Connecting to MCP server...")
-
-    # ── Connect to MCP ──────────────────────────────────────────────────────
-    client = MultiServerMCPClient(
-        {
-            "expense_tracker": {
-                "url": MCP_URL,
-                "transport": "streamable_http",
-            }
-        }
-    )
-
-    # ── Discover tools ──────────────────────────────────────────────────────
-    tools = await client.get_tools()
-    tool_names = [t.name for t in tools]
-    print(f"  Tools loaded: {len(tools)} — {', '.join(tool_names)}")
 
     # ── Discover prompts ────────────────────────────────────────────────────
     try:
