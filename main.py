@@ -75,6 +75,19 @@ def list_expenses(start_date: str, end_date: str):
 
 
 @mcp.tool
+def delete_expense(expense_id: int):
+    """
+    Delete an expense by its ID.
+    - expense_id: the ID of the expense to delete
+    """
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.execute("DELETE FROM expenses WHERE id = ?", (expense_id,))
+        if cur.rowcount == 0:
+            return {"status": "error", "message": f"No expense found with id {expense_id}"}
+        return {"status": "success", "deleted_id": expense_id}
+
+
+@mcp.tool
 def summarize(start_date: str, end_date: str, category: str = None):
     """
     Summarize total spending grouped by category within a date range.
