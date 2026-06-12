@@ -9,5 +9,10 @@ __pycache__/
 # Secrets — never commit real environment variables
 .env
 
+# OS / Editor artifacts
+thumbs.db
+.DS_Store
+nul
+
 # uv lock file is optional — commit it for reproducible deploys
 # uv.lock
