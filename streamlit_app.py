@@ -259,9 +259,9 @@ st.title("💬 Expense Tracker Assistant")
 st.markdown("The agent calls **MCP tools** — watch them appear in the sidebar →")
 
 # ── Quick examples ───────────────────────────────────────────────────────
+clicked = None
 if st.session_state.connected:
     cols = st.columns(len(BUILT_IN_EXAMPLES))
-    clicked = None
     for i, ex in enumerate(BUILT_IN_EXAMPLES):
         if cols[i].button(ex, use_container_width=True, key=f"ex_{i}"):
             clicked = ex
