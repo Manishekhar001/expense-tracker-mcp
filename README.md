@@ -63,4 +63,5 @@ Server starts at `http://localhost:8000/mcp`
 
 - **MCP Server:** Deployed on [Render](https://render.com) using `Procfile`
 - **Database:** Render PostgreSQL
-- **Live endpoint:** `https://expense-tracker-mcp.onrender.com/mcp`
+- **MCP Server endpoint:** `https://expense-tracker-mcp.onrender.com/mcp`
+- **Streamlit App (live demo):** [https://expense-tracker-streamlit-brjt.onrender.com/](https://expense-tracker-streamlit-brjt.onrender.com/)
