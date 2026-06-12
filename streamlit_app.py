@@ -196,12 +196,15 @@ with st.sidebar:
             with st.spinner("Connecting..."):
                 try:
                     # Quick connectivity test
-                    client = MultiServerMCPClient({
-                        "expense_tracker": {"url": MCP_URL, "transport": "streamable_http"},
-                    })
-                    tools = await client.get_tools()
+                    async def _test():
+                        client = MultiServerMCPClient({
+                            "expense_tracker": {"url": MCP_URL, "transport": "streamable_http"},
+                        })
+                        tools = await client.get_tools()
+                        return len(tools)
+                    n_tools = asyncio.run(_test())
                     st.session_state.connected = True
-                    st.success(f"✅ {len(tools)} MCP tools available")
+                    st.success(f"✅ {n_tools} MCP tools available")
                     st.rerun()
                 except Exception as e:
                     st.error(f"❌ Connection failed: {e}")
