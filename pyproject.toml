@@ -12,5 +12,6 @@ dependencies = [
     "langgraph>=1.2.4",
     "psycopg2-binary>=2.9.12",
     "python-dotenv>=1.2.2",
+    "streamlit>=1.43.0",
     "uvicorn>=0.29.0",
 ]

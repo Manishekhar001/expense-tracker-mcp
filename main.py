@@ -15,7 +15,6 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "")
 if DATABASE_URL:
     try:
         import psycopg2
-        import psycopg2.extras
     except ImportError:
         import sys
         print("psycopg2 not installed. Falling back to SQLite.", file=sys.stderr)
