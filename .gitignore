@@ -5,7 +5,6 @@ __pycache__/
 
 # Database — never commit local data to Git
 *.db
-DOCUMENTATION.md
 
 # Secrets — never commit real environment variables
 .env
