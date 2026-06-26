@@ -19,16 +19,11 @@ The backend (the MCP server) exposes 12 tools for CRUD operations on expenses, b
 |----------|-------------|
 | [Architecture Overview](architecture/overview.md) | High-level system design, component diagram, directory map, design decisions |
 | [Data Models](architecture/data-models.md) | All database tables, fields, constraints, relationships, and ER diagram |
-| [Technology Stack](architecture/tech-stack.md) | Languages, frameworks, libraries, external services, local prerequisites |
 | [Workflow: Add Expense](workflows/add-expense.md) | End-to-end flow: user says "add ₹350 for groceries" → tool call → database write → response |
 | [Workflow: Query Spending](workflows/query-spending.md) | End-to-end flow: user asks "what did I spend on food?" → summarise → respond |
 | [Workflow: Budget Check](workflows/budget-check.md) | End-to-end flow: comparing actual spending against budgeted amounts |
 | [Workflow: Application Startup](workflows/application-startup.md) | Server initialisation sequence and client connection flow |
 | [API Reference](api-reference.md) | All 12 MCP tools, 3 resources, and 2 prompts with exact signatures and examples |
-| [Configuration](configuration.md) | All environment variables, their purposes, and what breaks if missing |
-| [Development Guide](development-guide.md) | Local setup, running, testing, coding conventions, and how to extend |
-| [Deployment](deployment.md) | Render deployment, build commands, environment setup, health checks |
-| [Testing](testing.md) | Current test coverage, how to run tests, and known gaps |
 
 ## Quick Start
 
@@ -56,10 +51,4 @@ This opens `http://localhost:8501` in your browser. Click **"Connect & Start Dem
 - *"Show me my budget status"*
 - *"Search for anything with coffee"*
 
-## Run the test suite
 
-```bash
-uv run pytest
-```
-
-> ⚠️ **Note:** No test files currently exist in the repository. See [Testing](testing.md) for details.

@@ -79,7 +79,7 @@ flowchart TD
 
 ## Known limitations and technical debt ⚠️
 
-- **No test files exist.** The repository has zero test coverage. See [Testing](../testing.md) for details.
+- **No test files exist.** The repository has zero test coverage.
 - **`MCP_URL` is hardcoded** in `streamlit_app.py:24` to the Render deployment URL. To run the frontend against a local server, this must be changed manually.
 - **No migration system.** Tables are created via `CREATE TABLE IF NOT EXISTS` on every startup. Schema changes require manual ALTER TABLE statements or dropping and recreating the database.
 - **No structured logging.** The server prints to stderr only when `psycopg2` is missing. There is no `logging` module usage, no log levels, and no log aggregation.
