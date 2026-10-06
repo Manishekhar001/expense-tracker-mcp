@@ -10,6 +10,8 @@ import json
 import os
 from datetime import date
 
+import warnings
+
 import streamlit as st
 from dotenv import load_dotenv
 from langchain_core.messages import SystemMessage
@@ -18,12 +20,30 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.prebuilt import create_react_agent
 
+# The deprecation warning is misleading — langchain.agents does NOT have
+# create_react_agent. Suppress it until LangGraph fixes the message.
+warnings.filterwarnings(
+    "ignore",
+    message=".*create_react_agent.*",
+    category=DeprecationWarning,
+)
+
 # ── Configuration ──────────────────────────────────────────────────────────
 load_dotenv()
 
 MCP_URL = "https://expense-tracker-mcp.onrender.com/mcp"
 MCP_API_KEY = os.getenv("MCP_API_KEY", "")
 TODAY = date.today().strftime("%d/%m/%Y")
+
+# Currently available Groq models (update if Groq changes their catalogue)
+GROQ_MODELS = [
+    "llama-3.1-8b-instant",
+    "llama3-8b-8192",
+    "llama3-70b-8192",
+    "mixtral-8x7b-32768",
+    "gemma2-9b-it",
+]
+DEFAULT_MODEL = "llama-3.1-8b-instant"
 
 BUILT_IN_EXAMPLES = [
     "Add INR 350 for groceries",
@@ -286,6 +306,7 @@ for key, default in [
     ("tool_calls", []),
     ("connected", False),
     ("first_turn", True),
+    ("groq_model", DEFAULT_MODEL),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -342,7 +363,7 @@ async def run_agent(query: str) -> str:
             if tool.func is not None:
                 tool.func = _wrap_func(tool.func)
 
-        llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0)
+        llm = ChatGroq(model=st.session_state.groq_model, temperature=0)
         memory = MemorySaver()
         agent = create_react_agent(llm, tools, checkpointer=memory)
 
@@ -450,8 +471,28 @@ with st.sidebar:
 
     st.divider()
 
+    # ── Model selector ─────────────────────────────────────────────────
+    st.markdown("### 🧠 LLM Model")
+    selected_model = st.selectbox(
+        "Groq model",
+        options=GROQ_MODELS,
+        index=GROQ_MODELS.index(st.session_state.groq_model)
+              if st.session_state.groq_model in GROQ_MODELS else 0,
+        label_visibility="collapsed",
+    )
+    if selected_model != st.session_state.groq_model:
+        st.session_state.groq_model = selected_model
+        # Drop the cached agent so it's rebuilt with the new model on next query
+        st.session_state.pop("agent", None)
+        st.session_state.pop("client", None)
+        st.session_state.first_turn = True
+        st.info("Model changed — agent will reinitialise on next query.")
+
+    st.divider()
+
     # ── Tool Call Log ───────────────────────────────────────────────────
     st.markdown("### 🔧 Tool Calls")
+
 
     if not st.session_state.tool_calls:
         st.markdown(
