@@ -363,7 +363,11 @@ async def run_agent(query: str) -> str:
             if tool.func is not None:
                 tool.func = _wrap_func(tool.func)
 
+<<<<<<< HEAD
         llm = ChatGroq(model=st.session_state.groq_model, temperature=0)
+=======
+        llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
+>>>>>>> 2490454a8d8a44a2eef3944cbaccd44341fd836a
         memory = MemorySaver()
         agent = create_react_agent(llm, tools, checkpointer=memory)
 
