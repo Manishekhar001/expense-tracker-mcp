@@ -10,40 +10,51 @@ import json
 import os
 from datetime import date
 
-import warnings
-
 import streamlit as st
 from dotenv import load_dotenv
+from groq import Groq
 from langchain_core.messages import SystemMessage
 from langchain_groq import ChatGroq
+from langchain.agents import create_agent
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.checkpoint.memory import MemorySaver
-from langgraph.prebuilt import create_react_agent
-
-# The deprecation warning is misleading — langchain.agents does NOT have
-# create_react_agent. Suppress it until LangGraph fixes the message.
-warnings.filterwarnings(
-    "ignore",
-    message=".*create_react_agent.*",
-    category=DeprecationWarning,
-)
 
 # ── Configuration ──────────────────────────────────────────────────────────
 load_dotenv()
 
-MCP_URL = "https://expense-tracker-mcp.onrender.com/mcp"
+MCP_URL = os.getenv("MCP_SERVER_URL", "https://expense-tracker-mcp.onrender.com/mcp")
 MCP_API_KEY = os.getenv("MCP_API_KEY", "")
 TODAY = date.today().strftime("%d/%m/%Y")
 
-# Currently available Groq models (update if Groq changes their catalogue)
-GROQ_MODELS = [
-    "llama-3.1-8b-instant",
-    "llama3-8b-8192",
-    "llama3-70b-8192",
-    "mixtral-8x7b-32768",
-    "gemma2-9b-it",
-]
-DEFAULT_MODEL = "llama-3.1-8b-instant"
+
+def get_available_groq_models() -> list[str]:
+    """Dynamically discover models available to this Groq API key."""
+    fallback = ["qwen/qwen3.8-27b", "openai/gpt-oss-20b", "llama-3.1-8b-instant"]
+    api_key = os.getenv("GROQ_API_KEY", "")
+    if not api_key:
+        return fallback
+    try:
+        client = Groq(api_key=api_key)
+        m_list = client.models.list()
+        chat_models = [
+            m.id
+            for m in m_list.data
+            if not any(
+                skip in m.id.lower()
+                for skip in ["whisper", "guard", "safeguard", "orpheus"]
+            )
+        ]
+        preferred = ["qwen/qwen3.8-27b", "openai/gpt-oss-20b", "llama-3.1-8b-instant"]
+        sorted_models = [m for m in preferred if m in chat_models] + [
+            m for m in chat_models if m not in preferred
+        ]
+        return sorted_models if sorted_models else fallback
+    except Exception:
+        return fallback
+
+
+GROQ_MODELS = get_available_groq_models()
+DEFAULT_MODEL = GROQ_MODELS[0] if GROQ_MODELS else "qwen/qwen3.8-27b"
 
 BUILT_IN_EXAMPLES = [
     "Add INR 350 for groceries",
@@ -363,13 +374,14 @@ async def run_agent(query: str) -> str:
             if tool.func is not None:
                 tool.func = _wrap_func(tool.func)
 
-<<<<<<< HEAD
         llm = ChatGroq(model=st.session_state.groq_model, temperature=0)
-=======
-        llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
->>>>>>> 2490454a8d8a44a2eef3944cbaccd44341fd836a
         memory = MemorySaver()
-        agent = create_react_agent(llm, tools, checkpointer=memory)
+        agent = create_agent(
+            llm,
+            tools,
+            system_prompt=build_system_message(),
+            checkpointer=memory,
+        )
 
         st.session_state.client = client
         st.session_state.agent = agent
@@ -378,11 +390,7 @@ async def run_agent(query: str) -> str:
     agent = st.session_state.agent
 
     # ── Build messages ──────────────────────────────────────────────────
-    if st.session_state.first_turn:
-        messages = [SystemMessage(content=build_system_message()), ("human", query)]
-        st.session_state.first_turn = False
-    else:
-        messages = [("human", query)]
+    messages = [("human", query)]
 
     # ── Stream events ───────────────────────────────────────────────────
     st.session_state.current_tool_calls = []
